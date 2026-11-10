@@ -53,7 +53,7 @@ input:focus,select:focus,textarea:focus{outline:0;border-color:var(--ok);box-sha
 main{padding:24px 30px 20px;min-width:0}
 .top{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:20px;color:#fff}
 .top h2{font-size:28px}.top small{color:#a9c6b6}.who{display:flex;align-items:center;gap:12px;font-size:13px;color:#cfe3d7;text-align:right}
-.menu{display:none;background:#ffffff1a;border:0;color:#fff;border-radius:12px;padding:9px 14px;font-weight:600}
+.menu{display:inline-block;background:#ffffff1a;border:0;color:#fff;border-radius:12px;padding:9px 14px;font-weight:600}
 .in{animation:up .45s both}
 .card{background:var(--card);border-radius:var(--r);padding:20px 22px;margin-bottom:18px;box-shadow:0 12px 30px -18px #000a}
 .card h3{font-size:18px}.card .sub{color:var(--mut);font-size:13px;margin:2px 0 14px}
@@ -83,11 +83,30 @@ td{padding:11px 10px;border-bottom:1px solid var(--soft)}tr:hover td{background:
 .menu{display:inline-block}main{padding:16px 14px 10px}.g4{grid-template-columns:1fr 1fr}.g2{grid-template-columns:1fr}.top h2{font-size:22px}.who span{display:none}.row{grid-template-columns:84px 1fr 66px}.kpi strong{font-size:28px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 @media print{body{background:#fff}.side,.top,.np,.toast,#bar{display:none!important}.shell{display:block}main{padding:0}.card{box-shadow:none;padding:0}.rh{display:flex;gap:14px;align-items:center;border-bottom:2px solid #000;padding-bottom:8px;margin-bottom:14px}.rh img{width:70px}table{min-width:0;font-size:12px}.wm{color:#444}}
+
+#ld{position:fixed;inset:0;background:#06301cd9;backdrop-filter:blur(4px);display:grid;place-items:center;z-index:90;opacity:0;pointer-events:none;transition:opacity .25s}
+#ld.on{opacity:1;pointer-events:auto}#ld>div{display:flex;flex-direction:column;align-items:center}
+.lg{position:relative;width:120px;height:120px;display:grid;place-items:center}
+.lg i{position:absolute;inset:8px;border:3px solid var(--gold);border-radius:20px;animation:spin 1.8s cubic-bezier(.65,0,.35,1) infinite}
+.lg i+i{inset:24px;border-color:#ffffff88;border-radius:14px;animation-direction:reverse;animation-duration:1.4s}
+.lg img{width:62px;background:#fff;border-radius:10px;padding:3px;animation:pulse 1.3s ease-in-out infinite}
+#lt{color:#d6e8dd;margin:22px 0 0;font-weight:600}
+@keyframes spin{from{transform:rotate(45deg)}to{transform:rotate(405deg)}}@keyframes pulse{50%{transform:scale(1.14)}}
+.pw{position:relative}.pw input{padding-right:84px}
+.eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);border:0;background:var(--soft);border-radius:8px;padding:4px 11px;font-size:12px;font-weight:600;cursor:pointer;color:var(--mut)}
+.eye:hover{background:var(--line)}
+.x{margin-left:auto;background:#ffffff18;border:0;color:#fff;border-radius:10px;width:34px;height:34px;cursor:pointer;font-size:15px}.x:hover{background:#ffffff30}
+.bd{display:none}.shell.nomenu{grid-template-columns:1fr}.shell.nomenu .side{display:none}
+.pv{grid-column:1/-1;background:var(--soft);border-left:4px solid var(--ok);border-radius:14px;padding:12px 16px;margin-bottom:16px;font-size:14px}
+.pv b{font-size:17px}.pv.bad{border-color:var(--bad);background:#f9e5e1;color:#8d3328}
+.ig{position:relative}.ig input{padding-right:70px}.un{position:absolute;right:13px;top:50%;transform:translateY(-50%);color:var(--mut);font-size:13px;font-weight:600;pointer-events:none}
+@media(max-width:900px){.bd.on{display:block;position:fixed;inset:0;background:#0009;z-index:25;animation:up .2s both}}
 </style>
 </head>
 <body>
 <div id="bar"></div>
 <div id="app"></div>
+<div id="ld" aria-live="polite"><div><div class="lg"><i></i><i></i><img id="ldimg" alt=""></div><p id="lt">Memuat data…</p></div></div>
 <div id="toast" class="toast hide" role="status"></div>
 <script>
 "use strict";
@@ -100,15 +119,28 @@ const fd=d=>d?String(d).slice(0,10).split('-').reverse().join('/'):'-';
 const fdt=d=>d?fd(d)+' '+String(d).slice(11,16):'-';
 const today=()=>{const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 const ROLE={admin:'Admin',staff:'Petugas',viewer:'Viewer'};
-const TY={awal:['Stock awal','Isi stok di awal periode. Setelah disetujui, stok barang diganti dengan angka ini.'],tambah:['Penambahan barang','Catat barang yang masuk. Setelah disetujui, jumlahnya menambah stok.'],ambil:['Pengambilan barang','Catat barang yang diambil dapur. Setelah disetujui, jumlahnya mengurangi stok.']};
+const TY={awal:['Stock awal','Isi jumlah TOTAL stok saat ini. Angka ini menggantikan stok lama, bukan menambah.'],tambah:['Penambahan barang','Isi jumlah barang yang BARU masuk. Angka ini ditambahkan ke stok yang ada.'],ambil:['Pengambilan barang','Isi jumlah barang yang DIAMBIL. Angka ini mengurangi stok yang ada.']};
+const QL={awal:'Jumlah stok awal (total)',tambah:'Jumlah yang masuk (ditambah)',ambil:'Jumlah yang diambil (dikurangi)'};
+function prev(f){const box=f.querySelector('.pv'),it=D.items.find(i=>i.id===f.barang.value);if(!it){box.className='pv bad';box.textContent='Belum ada barang. Tambahkan dulu di menu Data barang.';return}
+const t=f.dataset.type,q=+f.qty.value,u=' '+esc(it.satuan);f.querySelectorAll('.un').forEach(e=>e.textContent=it.satuan);let bad=false,s=`Stok <b>${esc(it.nama)}</b> sekarang: <b>${fmt(it.stok)}${u}</b>`;
+if(q>0){if(t==='ambil'&&q>it.stok){bad=true;s=`Jumlah melebihi stok. Stok ${esc(it.nama)} hanya <b>${fmt(it.stok)}${u}</b>.`}
+else if(t==='tambah')s+=`<br>${fmt(it.stok)} + ${fmt(q)} = stok menjadi <b>${fmt(it.stok+q)}${u}</b>`;
+else if(t==='ambil')s+=`<br>${fmt(it.stok)} − ${fmt(q)} = stok menjadi <b>${fmt(it.stok-q)}${u}</b>`;
+else s+=`<br>Stok diganti menjadi <b>${fmt(q)}${u}</b>`}
+box.className='pv'+(bad?' bad':'');box.innerHTML=s}
 const A=['admin'],AS=['admin','staff'],ALL=['admin','staff','viewer'];
 const MENU=[['dashboard','Dashboard',ALL],['stock','Stock barang',ALL],['riwayat','Riwayat stok',ALL],['-'],['barang','Data barang',AS],['awal','Stock awal',AS],['tambah','Penambahan barang',AS],['ambil','Pengambilan barang',AS],['akhir','Stock akhir',AS],['-'],['setuju','Persetujuan',A],['catatan','Catatan',AS],['users','Kelola user',A],['log','Log aktivitas',A],['-'],['akun','Ganti sandi',ALL]];
-let D=null,token=sessionStorage.getItem('sd_t'),page='dashboard',editItem=null,rep=today().slice(0,7),anim=true,LOGS=[],last=Date.now();
+let menuHidden=false,D=null,token=sessionStorage.getItem('sd_t'),page='dashboard',editItem=null,rep=today().slice(0,7),anim=true,LOGS=[],last=Date.now();
 const can=r=>D&&r.includes(D.me.role);
 /* GANTI dengan alamat Web App dari Apps Script (berakhiran /exec) */
 const API_URL="https://script.google.com/macros/s/AKfycbzZvpoyikoSyVdJ5PSETO1LTgsF8KESbLDe1e-6I7imBTbSzbQUY1H10Q1CgQlWlsNpjw/exec";
 function rpc(fn,args){return fetch(API_URL,{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify({fn,args})}).then(r=>r.json())}
-const prog=v=>{$('#bar').style.width=v?'70%':'100%';if(!v)setTimeout(()=>$('#bar').style.width='0',400)};
+let lt,lon=false;
+function ldr(v,t){const e=$('#ld');if(t)$('#lt').textContent=t;
+if(v){if(lon)return;clearTimeout(lt);lt=setTimeout(()=>{lon=true;e.classList.add('on')},t?0:350)}
+else{clearTimeout(lt);lon=false;e.classList.remove('on');setTimeout(()=>{if(!lon)$('#lt').textContent='Memuat data…'},300)}}
+const prog=v=>{$('#bar').style.width=v?'70%':'100%';if(!v)setTimeout(()=>$('#bar').style.width='0',400);ldr(v)};
+const pwf=(n,ex)=>`<div class="pw"><input name="${n}" type="password" required maxlength="64" ${ex||''}><button type="button" class="eye" data-act="eye" aria-label="Lihat atau sembunyikan sandi">Lihat</button></div>`;
 function call(action,p){prog(1);return rpc('api',[token,action,p||{}]).then(r=>{prog(0);if(r.ok)return r;if(r.error==='SESI')out('Sesi berakhir, silakan masuk lagi');throw new Error(r.error)},e=>{prog(0);if(e instanceof Error&&!(e instanceof TypeError))throw e;throw new Error('Koneksi gagal. Coba lagi.')})}
 async function act(action,p,after){try{const r=await call(action,p);D=r.data;toast(r.msg||'Tersimpan');if(after)after();render()}catch(e){toast(e.message)}}
 function toast(m){const t=$('#toast');t.textContent=m;t.classList.remove('hide');t.style.animation='none';t.offsetHeight;t.style.animation='';clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.add('hide'),2800)}
@@ -134,17 +166,17 @@ function loginView(){const dm=[[8,12,90,'7s'],[70,6,130,'9s'],[40,62,60,'6s'],[8
 return `<div class="login">${dm}<div class="lside"><img src="${LOGO}" class="logo" alt="Logo Yonasindo"><h1>SI DAPUR<br>YONASINDO</h1><p>Catat stok sembako dapur dengan rapi, dari barang masuk sampai laporan bulanan.</p></div>
 <form class="lbox" data-form="login" autocomplete="off"><img src="${LOGO}" class="logo" alt="" style="width:86px;margin:0 0 14px;padding:0"><h2>Selamat datang</h2><p class="sub">Masuk dengan akun Anda.</p>
 <div class="f"><label for="u">Nama pengguna</label><input id="u" name="u" required maxlength="30" autocomplete="username"></div>
-<div class="f"><label for="p">Kata sandi</label><input id="p" name="p" type="password" required maxlength="64" autocomplete="current-password"></div>
+<div class="f"><label for="p">Kata sandi</label>${pwf('p','id="p" autocomplete="current-password"')}</div>
 <div class="err" id="lerr"></div><button class="btn gold" id="lb" style="width:100%">Masuk</button></form><div class="lw">${wm}</div></div>`}
 function render(){const app=$('#app');
 if(!token||!D){app.innerHTML=loginView();return}
 const pend=D.tx.filter(t=>t.status==='pending').length;
 const nav=MENU.filter(m=>m[0]==='-'||m[2].includes(D.me.role)).map(m=>m[0]==='-'?'<hr>':`<a data-act="go" data-p="${m[0]}" tabindex="0" class="${page===m[0]?'on':''}">${m[1]}${m[0]==='setuju'&&pend?`<span class="pill">${pend}</span>`:''}</a>`).join('');
 const title=(MENU.find(m=>m[0]===page)||[0,'Dashboard'])[1];
-app.innerHTML=`<div class="shell"><aside class="side" id="side"><div class="brand"><img src="${LOGO}" class="logo" alt=""><div><b>SI DAPUR</b><small>YONASINDO</small></div></div>${nav}</aside>
+app.innerHTML=`<div class="shell${menuHidden?' nomenu':''}"><div class="bd" data-act="menu"></div><aside class="side" id="side"><div class="brand"><img src="${LOGO}" class="logo" alt=""><div><b>SI DAPUR</b><small>YONASINDO</small></div><button class="x" data-act="menu" aria-label="Tutup menu">✕</button></div>${nav}</aside>
 <main><div class="top"><div style="display:flex;gap:12px;align-items:center"><button class="menu np" data-act="menu">Menu</button><div><h2>${esc(title)}</h2><small>${new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'})}</small></div></div>
 <div class="who"><span>${esc(D.me.nama)}<br>${ROLE[D.me.role]}</span><button class="btn gold sm" data-act="logout">Keluar</button></div></div>
-<div id="view" class="${anim?'in':''}">${(V[page]||V.dashboard)()}</div>${wm}</main></div>`;anim=false;count()}
+<div id="view" class="${anim?'in':''}">${(V[page]||V.dashboard)()}</div>${wm}</main></div>`;anim=false;count();document.querySelectorAll('[data-form=tx]').forEach(f=>prev(f))}
 function count(){document.querySelectorAll('[data-c]').forEach(e=>{const t=+e.dataset.c;if(matchMedia('(prefers-reduced-motion:reduce)').matches){e.textContent=fmt(t);return}let s=null;const f=ts=>{s=s??ts;const p=Math.min(1,(ts-s)/800);e.textContent=fmt(t*(1-Math.pow(1-p,3)));if(p<1)requestAnimationFrame(f)};requestAnimationFrame(f)})}
 function bars(list){return '<div>'+list.map(i=>{const mx=Math.max(i.stok,i.min*1.6,1);return `<div class="row"><span>${esc(i.nama)}</span><div class="trk"><div class="fill ${i.stok<i.min?'low':''}" style="width:${Math.min(100,i.stok/mx*100)}%"></div><div class="mk" style="left:${i.min/mx*100}%"></div></div><b class="n">${fmt(i.stok)} ${esc(i.satuan)}</b></div>`}).join('')+'</div><div class="leg"><span><i style="background:#2d9a5e"></i>Stok</span><span><i style="background:#c24b3b"></i>Di bawah minimum</span><span><i style="background:#16261d;width:2px"></i>Batas minimum</span></div>'}
 function chart(){const now=new Date(),R=[];for(let k=5;k>=0;k--){const d=new Date(now.getFullYear(),now.getMonth()-k,1),m=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');R.push({l:d.toLocaleDateString('id-ID',{month:'short'}),i:msum(m,'tambah'),o:msum(m,'ambil')})}
@@ -173,34 +205,36 @@ akhir(){const r=report(rep),n=new Date(rep+'-01T12:00').toLocaleDateString('id-I
 return `<div class="card np"><div style="display:flex;gap:12px;align-items:end;flex-wrap:wrap"><div><label>Bulan</label><input type="month" id="rm" value="${rep}" max="${today().slice(0,7)}"></div><button class="btn gold" data-act="print">Ekspor PDF</button></div></div>
 <div class="card"><div class="rh"><img src="${LOGO}" alt=""><div><h1>SI DAPUR YONASINDO</h1>Laporan stock bulanan, ${n}</div></div><h3 class="np">Stock akhir ${n}</h3><p class="sub np">Terisi otomatis: stok awal + barang masuk − barang diambil. Tidak perlu input.</p><div class="tw"><table><tr><th>Barang</th><th class="n">Awal</th><th class="n">Masuk</th><th class="n">Diambil</th><th class="n">Akhir</th><th>Satuan</th></tr>${r.map(x=>`<tr><td>${esc(x.it.nama)}</td><td class="n">${fmt(x.awal)}</td><td class="n">${fmt(x.masuk)}</td><td class="n">${fmt(x.keluar)}</td><td class="n"><b>${fmt(x.akhir)}</b></td><td>${esc(x.it.satuan)}</td></tr>`).join('')}</table></div><p class="sub" style="margin-top:12px">Dicetak ${new Date().toLocaleString('id-ID')} oleh ${esc(D.me.nama)}. Hanya catatan yang sudah disetujui yang dihitung.</p></div>`},
 catatan(){return `<div class="card"><h3>Tulis catatan</h3><p class="sub">Untuk hal di luar angka, misalnya barang rusak atau pengiriman terlambat.</p><form data-form="note"><div class="f"><textarea name="teks" rows="3" required maxlength="500"></textarea></div><button class="btn gold">Simpan</button></form></div><div class="card"><h3>Semua catatan</h3>${D.notes.length?[...D.notes].reverse().map(n=>`<div style="padding:12px 0;border-bottom:1px solid var(--soft)"><div style="white-space:pre-wrap">${esc(n.teks)}</div><small style="color:var(--mut)">${esc(nm(n.oleh))}, ${new Date(n.ts).toLocaleString('id-ID')}</small> ${can(A)||n.oleh===D.me.id?`<button class="btn ghost sm" data-act="delNote" data-id="${n.id}">Hapus</button>`:''}</div>`).join(''):'<div class="empty">Belum ada catatan.</div>'}</div>`},
-users(){return `<div class="card"><h3>Tambah user</h3><p class="sub">Sandi minimal 8 karakter dengan huruf besar, kecil, dan angka.</p><form class="form" data-form="user" autocomplete="off"><div class="f"><label>Nama lengkap</label><input name="nama" required maxlength="40"></div><div class="f"><label>Nama pengguna</label><input name="user" required maxlength="30" pattern="[a-zA-Z0-9._-]{3,30}"></div><div class="f"><label>Peran</label><select name="role"><option value="staff">Petugas</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div><div class="f"><label>Sandi</label><input name="pw" type="password" required maxlength="64" autocomplete="new-password"></div><div class="f"><button class="btn gold">Tambah</button></div></form></div>
-<div class="card"><h3>Daftar user</h3><div class="tw"><table style="min-width:680px"><tr><th>Nama</th><th>Pengguna</th><th>Peran</th><th>Status</th><th>Sandi baru</th><th></th></tr>${D.users.map(u=>`<tr><td>${esc(u.nama)}</td><td>${esc(u.user)}</td><td>${ROLE[u.role]}</td><td>${u.aktif==='1'?'<span class="tag t-ok">Aktif</span>':'<span class="tag t-bad">Nonaktif</span>'}</td><td><form data-form="pw" style="display:flex;gap:6px"><input type="hidden" name="id" value="${u.id}"><input name="pw" type="password" required maxlength="64" autocomplete="new-password" style="padding:6px 10px"><button class="btn ghost sm">Ganti</button></form></td><td style="white-space:nowrap">${u.id!==D.me.id?`<button class="btn ghost sm" data-act="toggleUser" data-id="${u.id}">${u.aktif==='1'?'Nonaktifkan':'Aktifkan'}</button> <button class="btn bad sm" data-act="delUser" data-id="${u.id}">Hapus</button>`:'<small>Akun Anda</small>'}</td></tr>`).join('')}</table></div></div>`},
+users(){return `<div class="card"><h3>Tambah user</h3><p class="sub">Sandi minimal 8 karakter dengan huruf besar, kecil, dan angka.</p><form class="form" data-form="user" autocomplete="off"><div class="f"><label>Nama lengkap</label><input name="nama" required maxlength="40"></div><div class="f"><label>Nama pengguna</label><input name="user" required maxlength="30" pattern="[a-zA-Z0-9._-]{3,30}"></div><div class="f"><label>Peran</label><select name="role"><option value="staff">Petugas</option><option value="viewer">Viewer</option><option value="admin">Admin</option></select></div><div class="f"><label>Sandi</label>${pwf('pw','autocomplete="new-password"')}</div><div class="f"><button class="btn gold">Tambah</button></div></form></div>
+<div class="card"><h3>Daftar user</h3><div class="tw"><table style="min-width:680px"><tr><th>Nama</th><th>Pengguna</th><th>Peran</th><th>Status</th><th>Sandi baru</th><th></th></tr>${D.users.map(u=>`<tr><td>${esc(u.nama)}</td><td>${esc(u.user)}</td><td>${ROLE[u.role]}</td><td>${u.aktif==='1'?'<span class="tag t-ok">Aktif</span>':'<span class="tag t-bad">Nonaktif</span>'}</td><td><form data-form="pw" style="display:flex;gap:6px;min-width:230px"><input type="hidden" name="id" value="${u.id}">${pwf('pw','autocomplete="new-password" style="padding:6px 84px 6px 10px"')}<button class="btn ghost sm">Ganti</button></form></td><td style="white-space:nowrap">${u.id!==D.me.id?`<button class="btn ghost sm" data-act="toggleUser" data-id="${u.id}">${u.aktif==='1'?'Nonaktifkan':'Aktifkan'}</button> <button class="btn bad sm" data-act="delUser" data-id="${u.id}">Hapus</button>`:'<small>Akun Anda</small>'}</td></tr>`).join('')}</table></div></div>`},
 log(){return `<div class="card"><h3>Log aktivitas</h3><p class="sub">300 kegiatan terakhir.</p><div class="tw"><table><tr><th>Waktu</th><th>Pengguna</th><th>Kegiatan</th></tr>${LOGS.map(l=>`<tr><td style="white-space:nowrap">${fdt(l.ts)}</td><td>${esc(l.user)}</td><td>${esc(l.aksi)}</td></tr>`).join('')||'<tr><td colspan="3" class="empty">Memuat…</td></tr>'}</table></div></div>`},
-akun(){return `<div class="card" style="max-width:460px"><h3>Ganti sandi</h3><p class="sub">Gunakan sandi yang hanya Anda yang tahu.</p><form data-form="mypw" autocomplete="off"><div class="f"><label>Sandi lama</label><input name="old" type="password" required maxlength="64" autocomplete="current-password"></div><div class="f"><label>Sandi baru</label><input name="pw" type="password" required maxlength="64" autocomplete="new-password"></div><button class="btn gold">Simpan sandi</button></form></div>`}};
-['awal','tambah','ambil'].forEach(t=>V[t]=()=>`<div class="card"><h3>${TY[t][0]}</h3><p class="sub">${TY[t][1]}${D.me.role==='staff'?' Catatan Anda menunggu persetujuan admin.':''}</p><form class="form" data-form="tx" data-type="${t}"><div class="f"><label>Barang</label><select name="barang" required>${D.items.map(i=>`<option value="${i.id}">${esc(i.nama)} (stok ${fmt(i.stok)} ${esc(i.satuan)})</option>`).join('')}</select></div><div class="f"><label>Jumlah</label><input name="qty" type="number" min="0.01" step="any" required></div><div class="f"><label>Tanggal</label><input name="tanggal" type="date" required value="${today()}" max="${today()}"></div><div class="f"><label>Keterangan</label><input name="catatan" maxlength="120"></div><div class="f"><button class="btn gold">Kirim</button></div></form></div><div class="card"><h3>Catatan terakhir</h3>${txTable(D.tx.filter(x=>x.tipe===t).sort((a,b)=>b.ts-a.ts).slice(0,20),false,true)}</div>`);
+akun(){return `<div class="card" style="max-width:460px"><h3>Ganti sandi</h3><p class="sub">Gunakan sandi yang hanya Anda yang tahu.</p><form data-form="mypw" autocomplete="off"><div class="f"><label>Sandi lama</label>${pwf('old','autocomplete="current-password"')}</div><div class="f"><label>Sandi baru</label>${pwf('pw','autocomplete="new-password"')}</div><button class="btn gold">Simpan sandi</button></form></div>`}};
+['awal','tambah','ambil'].forEach(t=>V[t]=()=>`<div class="card"><h3>${TY[t][0]}</h3><p class="sub">${TY[t][1]}${D.me.role==='staff'?' Catatan Anda menunggu persetujuan admin.':''}</p><form class="form" data-form="tx" data-type="${t}"><div class="pv"></div><div class="f"><label>Barang</label><select name="barang" required>${D.items.map(i=>`<option value="${i.id}">${esc(i.nama)} (stok ${fmt(i.stok)} ${esc(i.satuan)})</option>`).join('')}</select></div><div class="f"><label>${QL[t]}</label><div class="ig"><input name="qty" type="number" min="0.01" step="any" inputmode="decimal" required><span class="un"></span></div></div><div class="f"><label>Tanggal</label><input name="tanggal" type="date" required value="${today()}" max="${today()}"></div><div class="f"><label>Keterangan</label><input name="catatan" maxlength="120"></div><div class="f"><button class="btn gold">Kirim</button></div></form></div><div class="card"><h3>Catatan terakhir</h3>${txTable(D.tx.filter(x=>x.tipe===t).sort((a,b)=>b.ts-a.ts).slice(0,20),false,true)}</div>`);
 
 /* aksi */
 const acts={
-go(d){page=d.p;anim=true;$('#side')?.classList.remove('open');if(page==='log')call('logs').then(r=>{LOGS=r.data;if(page==='log')render()}).catch(e=>toast(e.message));render();scrollTo(0,0)},
-menu(){$('#side').classList.toggle('open')},logout(){out()},print(){window.print()},
+go(d){page=d.p;anim=true;$('#side')?.classList.remove('open');$('.bd')?.classList.remove('on');if(page==='log')call('logs').then(r=>{LOGS=r.data;if(page==='log')render()}).catch(e=>toast(e.message));render();scrollTo(0,0)},
+menu(){if(matchMedia('(max-width:900px)').matches){$('#side').classList.toggle('open');$('.bd').classList.toggle('on')}else{menuHidden=!menuHidden;$('.shell').classList.toggle('nomenu',menuHidden)}},logout(){out()},print(){window.print()},
 edit(d){editItem=d.id;render()},cancel(){editItem=null;render()},
 delItem(d){act('delItem',{id:d.id})},dec(d){act('decide',{id:d.id,ok:!!d.ok})},delNote(d){act('delNote',{id:d.id})},
+eye(d,b){const i=b.previousElementSibling,s=i.type==='password';i.type=s?'text':'password';b.textContent=s?'Sembunyi':'Lihat'},
 toggleUser(d){act('toggleUser',{id:d.id})},delUser(d){act('delUser',{id:d.id})}};
 const forms={
 login(f){const b=$('#lb'),box=$('.lbox');b.disabled=true;b.textContent='Memeriksa…';
-rpc('login',[f.get('u'),f.get('p')]).then(async r=>{if(r.ok){token=r.token;sessionStorage.setItem('sd_t',token);try{const x=await call('boot');D=x.data;page='dashboard';anim=true;render()}catch(e){out(e.message)}}else{b.disabled=false;b.textContent='Masuk';$('#lerr').textContent=r.error;box.classList.remove('shake');box.offsetHeight;box.classList.add('shake')}}).catch(()=>{b.disabled=false;b.textContent='Masuk';$('#lerr').textContent='Koneksi gagal. Coba lagi.'})},
+ldr(true,'Memeriksa akun…');rpc('login',[f.get('u'),f.get('p')]).then(async r=>{ldr(false);if(r.ok){token=r.token;sessionStorage.setItem('sd_t',token);try{const x=await call('boot');D=x.data;page='dashboard';anim=true;render()}catch(e){out(e.message)}}else{b.disabled=false;b.textContent='Masuk';$('#lerr').textContent=r.error;box.classList.remove('shake');box.offsetHeight;box.classList.add('shake')}}).catch(()=>{ldr(false);b.disabled=false;b.textContent='Masuk';$('#lerr').textContent='Koneksi gagal. Coba lagi.'})},
 item(f){act('saveItem',{id:editItem,nama:f.get('nama'),satuan:f.get('satuan'),min:f.get('min')},()=>editItem=null)},
 tx(f,form){act('addTx',{tipe:form.dataset.type,barang:f.get('barang'),qty:f.get('qty'),tanggal:f.get('tanggal'),catatan:f.get('catatan')},()=>form.reset())},
 note(f){act('addNote',{teks:f.get('teks')})},
 user(f){act('saveUser',{nama:f.get('nama'),user:f.get('user'),role:f.get('role'),pw:f.get('pw')})},
 pw(f){act('resetPw',{id:f.get('id'),pw:f.get('pw')})},
 mypw(f){act('changePw',{old:f.get('old'),pw:f.get('pw')})}};
-document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&acts[b.dataset.act])acts[b.dataset.act](b.dataset)});
+document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(b&&acts[b.dataset.act])acts[b.dataset.act](b.dataset,b)});
 document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.matches('.side a'))e.target.click()});
 document.addEventListener('submit',e=>{const f=e.target.closest('[data-form]');if(!f)return;e.preventDefault();forms[f.dataset.form](new FormData(f),f)});
-document.addEventListener('input',e=>{if(e.target.id==='q'){const q=e.target.value.toLowerCase();document.querySelectorAll('#st tr').forEach((r,i)=>{if(i)r.style.display=r.textContent.toLowerCase().includes(q)?'':'none'})}});
-document.addEventListener('change',e=>{if(e.target.id==='rm'&&e.target.value){rep=e.target.value;render()}});
-(async()=>{if(token){try{D=(await call('boot')).data}catch(e){token=null}}render()})();
+document.addEventListener('input',e=>{const fm=e.target.closest&&e.target.closest('[data-form=tx]');if(fm)prev(fm);if(e.target.id==='q'){const q=e.target.value.toLowerCase();document.querySelectorAll('#st tr').forEach((r,i)=>{if(i)r.style.display=r.textContent.toLowerCase().includes(q)?'':'none'})}});
+document.addEventListener('change',e=>{const fm=e.target.closest&&e.target.closest('[data-form=tx]');if(fm)prev(fm);if(e.target.id==='rm'&&e.target.value){rep=e.target.value;render()}});
+$('#ldimg').src=LOGO;
+(async()=>{if(token){ldr(true,'Menyiapkan data…');try{D=(await call('boot')).data}catch(e){token=null}ldr(false)}render()})();
 </script>
 </body>
 </html>
